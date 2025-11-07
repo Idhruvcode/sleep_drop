@@ -105,6 +105,26 @@ On Unix shells replace the line continuation character `^` with `\`.
 
 ---
 
+### Docker deployment
+
+1. Ensure your `.env` file is populated with the required OpenAI and Pinecone credentials.
+2. Build the image:
+   ```bash
+   docker build -t sleep-assistant .
+   ```
+3. Run the API service (port 8001) with the environment file mounted:
+   ```bash
+   docker run --env-file .env -p 8001:8001 sleep-assistant
+   ```
+
+Alternatively, you can use the included Compose file:
+```bash
+docker compose up --build
+```
+The Compose service loads variables from `.env` and exposes the API on `http://localhost:8001`.
+
+---
+
 ## Project structure
 
 ```plaintext
