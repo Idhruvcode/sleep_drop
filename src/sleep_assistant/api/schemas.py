@@ -19,7 +19,14 @@ def message_to_dict(message: BaseMessage) -> Dict[str, str]:
     else:
         role = getattr(message, "type", "assistant")
 
-    return {"role": role, "content": message.content}
+    # Convert content to string - it may be str, list, or dict
+    content = message.content
+    if isinstance(content, str):
+        content_str = content
+    else:
+        content_str = str(content)
+
+    return {"role": role, "content": content_str}
 
 
 class ChatRequest(BaseModel):
