@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from langchain_core.messages import AIMessage, HumanMessage
 
@@ -34,13 +34,16 @@ def run_cli(app=None) -> None:
             print("Goodbye!")
             break
 
-        state["messages"].append(HumanMessage(content=user_input))
-        state = app.invoke(state)
+        messages = state.get("messages", [])
+        messages.append(HumanMessage(content=user_input))
+        state["messages"] = messages
+        state = cast(ChatState, app.invoke(state))
         route = state.get("current_route") or state.get("route", "sleep")
         logger.info("Route used for latest turn: %s", route)
 
+        state_messages = state.get("messages", [])
         ai_response = next(
-            (message.content for message in reversed(state["messages"]) if isinstance(message, AIMessage)),
+            (message.content for message in reversed(state_messages) if isinstance(message, AIMessage)),
             "I'm not sure how to respond to that.",
         )
         print(f"Bot: {ai_response}")
