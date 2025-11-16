@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import logging
 
-from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
-from sleep_assistant.graph.state import ChatState
+from sleep_assistant.graph.state import ChatState, get_last_user_message
 from sleep_assistant.graph.prompts.router import get_router_prompt
 
 logger = logging.getLogger(__name__)
@@ -23,10 +22,7 @@ def build_router_chain(router_llm: ChatOpenAI):
 def router_node(state: ChatState, router_chain) -> str:
     """Choose between the general and sleep branches."""
 
-    latest_user = next(
-        (message.content for message in reversed(state["messages"]) if isinstance(message, HumanMessage)),
-        None,
-    )
+    latest_user = get_last_user_message(state)
     if not latest_user:
         return "sleep"
 

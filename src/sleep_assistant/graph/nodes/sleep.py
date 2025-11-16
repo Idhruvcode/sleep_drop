@@ -5,11 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Dict, List
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage
 from langchain_openai import OpenAIEmbeddings
 from pinecone import Pinecone
 
-from sleep_assistant.graph.state import ChatState
+from sleep_assistant.graph.state import ChatState, get_last_user_message
 from sleep_assistant.graph.prompts.sleep import get_sleep_prompt
 
 logger = logging.getLogger(__name__)
@@ -26,10 +26,7 @@ def make_sleep_node(index: Pinecone.Index, embedder: OpenAIEmbeddings, sleep_cha
     """Build the LangGraph node for sleep-related responses."""
 
     def node(state: ChatState) -> Dict[str, object]:
-        latest_user = next(
-            (message.content for message in reversed(state["messages"]) if isinstance(message, HumanMessage)),
-            "",
-        )
+        latest_user = get_last_user_message(state) or ""
         if not latest_user:
             return {"messages": [AIMessage(content="I didn't catch that. Could you repeat your question?")]}
 

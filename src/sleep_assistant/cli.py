@@ -6,10 +6,10 @@ import logging
 import sys
 from typing import List, Optional, cast
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage
 
 from sleep_assistant.graph import build_app
-from sleep_assistant.graph.state import ChatState
+from sleep_assistant.graph.state import ChatState, record_user_message
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ def run_cli(app=None) -> None:
         app = build_app()
 
     print("Sleep Assistant ready! Type your message (or 'exit' to quit).")
-    state: ChatState = {"messages": []}
+    state: ChatState = {"messages": [], "user_history": []}
 
     while True:
         try:
@@ -34,9 +34,7 @@ def run_cli(app=None) -> None:
             print("Goodbye!")
             break
 
-        messages = state.get("messages", [])
-        messages.append(HumanMessage(content=user_input))
-        state["messages"] = messages
+        record_user_message(state, user_input)
         state = cast(ChatState, app.invoke(state))
         route = state.get("current_route") or state.get("route", "sleep")
         logger.info("Route used for latest turn: %s", route)

@@ -6,11 +6,12 @@ import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage
 
 from sleep_assistant.api.deps import Sessions, get_graph_app, get_sessions_store
 from sleep_assistant.api.schemas import ChatRequest, ChatResponse, message_to_dict
 from sleep_assistant.api.validators import validate_user_message
+from sleep_assistant.graph.state import record_user_message
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +42,8 @@ async def chat_endpoint(
         )
 
     message = request.message.strip()
-    state = sessions.setdefault(session_id, {"messages": []})
-
-    state["messages"].append(HumanMessage(content=message))
+    state = sessions.setdefault(session_id, {"messages": [], "user_history": []})
+    record_user_message(state, message)
     updated_state = graph_app.invoke(state)
     sessions[session_id] = updated_state
 
