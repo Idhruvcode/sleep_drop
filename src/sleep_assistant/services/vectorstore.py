@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from pinecone import Pinecone
 
@@ -12,7 +12,7 @@ from sleep_assistant.config import get_env, require_env
 logger = logging.getLogger(__name__)
 
 
-def build_pinecone_index(pinecone_client: Pinecone) -> Pinecone.Index:
+def build_pinecone_index(pinecone_client: Pinecone) -> Any:
     """Return a Pinecone index handle ensuring accessibility."""
 
     index_name = require_env("PINECONE_INDEX_NAME")

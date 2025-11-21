@@ -20,12 +20,14 @@ _ALPHA_PATTERN = re.compile(r"[A-Za-z]")
 _SAFE_PATTERNS = (
     re.compile(r"\b(?:kill|suicide|self-harm|weapon|bomb|attack)\b", re.IGNORECASE),
 )
+_SHORT_WHITELIST = {"hi", "hey", "yo", "ok", "no", "yes"}
+
 
 def _is_meaningful(message: str) -> bool:
     """Return True if the message contains sufficient content to consider."""
 
     if len(message) < _MEANINGFUL_MIN_CHARACTERS:
-        return False
+        return message.lower() in _SHORT_WHITELIST
     return bool(_ALPHA_PATTERN.search(message))
 
 

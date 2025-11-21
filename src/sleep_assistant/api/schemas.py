@@ -46,7 +46,16 @@ class ChatResponse(BaseModel):
     reply: str
     route: str
     messages: List[Dict[str, str]]
+    sources: List["SourceMetadata"] = Field(default_factory=list)
 
 
-__all__ = ["ChatRequest", "ChatResponse", "message_to_dict"]
+class SourceMetadata(BaseModel):
+    """Metadata describing which document snippets informed the reply."""
 
+    text: Optional[str] = None
+    page_number: int | str | None = None
+    source_document: Optional[str] = None
+    score: Optional[float] = None
+
+
+__all__ = ["ChatRequest", "ChatResponse", "SourceMetadata", "message_to_dict"]

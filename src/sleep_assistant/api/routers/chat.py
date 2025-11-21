@@ -32,7 +32,7 @@ async def chat_endpoint(
         logger.info("Rejected message for session %s: %s", session_id, validation.error_message)
         existing_state = sessions.get(session_id)
         messages_payload = (
-            [message_to_dict(msg) for msg in existing_state["messages"]] if existing_state else []
+            [message_to_dict(msg) for msg in existing_state.get("messages", [])] if existing_state else []
         )
         return ChatResponse(
             session_id=session_id,
@@ -47,17 +47,32 @@ async def chat_endpoint(
     updated_state = graph_app.invoke(state)
     sessions[session_id] = updated_state
 
-    reply = next(
-        (msg.content for msg in reversed(updated_state["messages"]) if isinstance(msg, AIMessage)),
-        "I'm not sure how to respond to that.",
-    )
+    # Extract reply from AI message, converting content to string if needed
+    reply = "I'm not sure how to respond to that."
+    for msg in reversed(updated_state.get("messages", [])):
+        if isinstance(msg, AIMessage):
+            content = msg.content
+            reply = content if isinstance(content, str) else str(content)
+            break
     route = updated_state.get("current_route") or updated_state.get("route", "sleep")
     logger.info("Session %s used route '%s'.", session_id, route)
 
-    messages_payload = [message_to_dict(msg) for msg in updated_state["messages"]]
+    messages_payload = [message_to_dict(msg) for msg in updated_state.get("messages", [])]
+    sources_payload = []
+    for item in updated_state.get("retrievals", []) or []:
+        if isinstance(item, dict):
+            sources_payload.append(
+                {
+                    "text": item.get("text"),
+                    "page_number": item.get("page_number"),
+                    "source_document": item.get("source_document"),
+                    "score": item.get("score"),
+                }
+            )
     return ChatResponse(
         session_id=session_id,
         reply=reply,
         route=route,
         messages=messages_payload,
+        sources=sources_payload,
     )

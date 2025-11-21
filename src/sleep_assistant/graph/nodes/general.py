@@ -17,11 +17,13 @@ def make_general_node(general_llm: ChatOpenAI):
 
     def node(state: ChatState) -> Dict[str, object]:
         logger.info("General node responding to latest message.")
+        messages = state.get("messages", [])
         return {
-            "messages": [general_llm.invoke(state["messages"])],
+            "messages": [general_llm.invoke(messages)],
             "route": "general",
             "current_route": "general",
             "last_node": "general",
+            "retrievals": [],
         }
 
     return node

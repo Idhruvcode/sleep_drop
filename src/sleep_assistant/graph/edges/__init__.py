@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, Mapping
+from typing import Callable, Hashable, Mapping, cast
 
 from langgraph.graph import END, StateGraph
 
@@ -21,7 +21,7 @@ def configure_edges(
     graph: StateGraph,
     *,
     route_selector: Callable[[ChatState], str] | None = None,
-    route_edges: Mapping[str, str] | None = None,
+    route_edges: Mapping[Hashable, str] | None = None,
 ) -> None:
     """Attach the standard routing edges to the graph.
 
@@ -38,7 +38,9 @@ def configure_edges(
     """
 
     selector = route_selector or _default_route_selector
-    edges = dict(route_edges or {"general": "general", "sleep": "sleep"})
+    edges = cast(
+        dict[Hashable, str], dict(route_edges or {"general": "general", "sleep": "sleep"})
+    )
 
     graph.add_conditional_edges("router", selector, edges)
     graph.add_edge("general", END)

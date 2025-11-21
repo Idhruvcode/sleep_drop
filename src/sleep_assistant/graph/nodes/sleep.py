@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import AIMessage
 from langchain_openai import OpenAIEmbeddings
 from pinecone import Pinecone
 
-from sleep_assistant.graph.state import ChatState, get_last_user_message
+from sleep_assistant.graph.state import ChatState, RetrievedDocument, get_last_user_message
 from sleep_assistant.graph.prompts.sleep import get_sleep_prompt
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,25 @@ def build_sleep_chain(sleep_llm):
     return sleep_prompt | sleep_llm
 
 
-def make_sleep_node(index: Pinecone.Index, embedder: OpenAIEmbeddings, sleep_chain):
+def _extract_text(metadata: Dict[str, object]) -> Optional[str]:
+    """Return the best-guess text field from Pinecone metadata."""
+
+    text_keys = (
+        "text",
+        "content",
+        "chunk",
+        "chunk_text",
+        "page_content",
+        "text_preview",
+    )
+    for key in text_keys:
+        value = metadata.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
+
+
+def make_sleep_node(index: Any, embedder: OpenAIEmbeddings, sleep_chain):
     """Build the LangGraph node for sleep-related responses."""
 
     def node(state: ChatState) -> Dict[str, object]:
@@ -34,12 +52,31 @@ def make_sleep_node(index: Pinecone.Index, embedder: OpenAIEmbeddings, sleep_cha
         results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
 
         contexts: List[str] = []
+        retrievals: List[RetrievedDocument] = []
         matches = getattr(results, "matches", None) or []
         for match in matches:
             metadata = getattr(match, "metadata", None) or {}
-            text = metadata.get("text")
+            text = _extract_text(metadata)
             if text:
-                contexts.append(text)
+                page_number = metadata.get("page_number") or metadata.get("page")
+                source_document = metadata.get("source_document") or metadata.get("source")
+                label_parts = []
+                if source_document:
+                    label_parts.append(f"Source: {source_document}")
+                if page_number is not None:
+                    label_parts.append(f"Page: {page_number}")
+                label = f"[{', '.join(label_parts)}]\n" if label_parts else ""
+                contexts.append(f"{label}{text}".strip())
+
+                retrieved: RetrievedDocument = {"text": text}
+                if page_number is not None:
+                    retrieved["page_number"] = page_number
+                if source_document:
+                    retrieved["source_document"] = source_document
+                score = getattr(match, "score", None)
+                if score is not None:
+                    retrieved["score"] = score
+                retrievals.append(retrieved)
 
         if contexts:
             combined_context = "\n\n".join(contexts)
@@ -50,6 +87,12 @@ def make_sleep_node(index: Pinecone.Index, embedder: OpenAIEmbeddings, sleep_cha
             ai_message = AIMessage(
                 content="I'm not sure. I couldn't find relevant information about that in my sleep knowledge base."
             )
-        return {"messages": [ai_message], "route": "sleep", "current_route": "sleep", "last_node": "sleep"}
+        return {
+            "messages": [ai_message],
+            "route": "sleep",
+            "current_route": "sleep",
+            "last_node": "sleep",
+            "retrievals": retrievals,
+        }
 
     return node

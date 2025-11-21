@@ -29,6 +29,16 @@ class ChatState(TypedDict, total=False):
     route: Literal["general", "sleep"]
     current_route: str
     last_node: str
+    retrievals: List["RetrievedDocument"]
+
+
+class RetrievedDocument(TypedDict, total=False):
+    """Metadata captured from the vector store for transparency."""
+
+    text: str
+    page_number: int | str
+    source_document: str
+    score: float
 
 
 def record_user_message(state: "ChatState", content: str, *, max_history: int = MAX_USER_HISTORY) -> None:
@@ -86,6 +96,7 @@ def get_last_user_message(state: "ChatState") -> str | None:
 __all__ = [
     "ChatState",
     "MAX_USER_HISTORY",
+    "RetrievedDocument",
     "get_last_user_message",
     "get_recent_user_messages",
     "record_user_message",
