@@ -12,3 +12,4 @@
 .cursorignore.development.local
 .cursorignore.test.local
 .cursorignore.production.local
+logs/

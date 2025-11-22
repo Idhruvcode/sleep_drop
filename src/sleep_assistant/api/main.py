@@ -7,12 +7,14 @@ from fastapi import FastAPI
 from sleep_assistant.api.deps import get_graph_app
 from sleep_assistant.api.routers import chat_router
 from sleep_assistant.config import load_environment
+from sleep_assistant.logging import configure_logging
 
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
 
     load_environment()
+    configure_logging()
 
     app = FastAPI(title="Sleep Assistant API", version="1.0.0")
     app.include_router(chat_router)

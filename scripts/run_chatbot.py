@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import logging
 import sys
 from pathlib import Path
-
-LOG_FORMAT = "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
-logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = PROJECT_ROOT / "src"
@@ -17,6 +13,9 @@ for path in (PROJECT_ROOT, SRC_ROOT):
         sys.path.insert(0, str_path)
 
 from sleep_assistant.cli import main
+from sleep_assistant.logging import configure_logging
+
+configure_logging()
 
 
 if __name__ == "__main__":
