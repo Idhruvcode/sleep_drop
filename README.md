@@ -1,6 +1,6 @@
 # Sleep Assistant Service
 
-The Sleep Assistant is a LangGraph-powered multi-agent experience that routes every user message to the right expertise. It distinguishes casual greetings from sleep-focused questions, enriches sleep conversations with Pinecone-backed context retrieval, and serves responses through a CLI helper and a FastAPI endpoint.
+The Sleep Assistant is a LangGraph-powered multi-agent experience that routes every user message to the right expertise. It distinguishes casual greetings from sleep-focused questions, enriches sleep conversations with MongoDB Atlas Vector Search context retrieval, and serves responses through a CLI helper and a FastAPI endpoint.
 
 ---
 
@@ -9,7 +9,7 @@ The Sleep Assistant is a LangGraph-powered multi-agent experience that routes ev
 - FastAPI service for real-time chat over HTTP on port 8001.
 - CLI companion (`scripts/run_chatbot.py`) for local conversational testing.
 - LangGraph orchestration with an intent router, general chat node, and sleep-specialist node.
-- Sleep knowledge base powered by Pinecone vector search and OpenAI embeddings.
+- Sleep knowledge base powered by MongoDB Atlas Vector Search and OpenAI embeddings.
 - Environment-driven configuration with a simple `.env` workflow.
 - Optional observability through LangSmith and structured logging.
 
@@ -17,7 +17,7 @@ The Sleep Assistant is a LangGraph-powered multi-agent experience that routes ev
 
 1. The router prompt classifies each incoming message as either `general` or `sleep`.
 2. Greetings and small talk are answered by the general node via an LLM tuned for casual conversation.
-3. Sleep-related questions trigger Pinecone retrieval, combining matched snippets with a dedicated sleep prompt before responding.
+3. Sleep-related questions trigger MongoDB vector retrieval, combining matched snippets with a dedicated sleep prompt before responding.
 
 ---
 
@@ -25,7 +25,8 @@ The Sleep Assistant is a LangGraph-powered multi-agent experience that routes ev
 
 - Python 3.11 (CPython recommended)
 - OpenAI API credentials with access to the configured chat and embedding models
-- Pinecone account and index (serverless or pod)
+- MongoDB Atlas cluster with an enabled vector search index
+- Tesseract OCR binary (required if you ingest scanned PDFs with the included script)
 - Optional: Conda for `environment.yml`, or any other virtual environment manager
 - Optional: LangSmith account for tracing (`LANGCHAIN_*` variables)
 
@@ -58,9 +59,13 @@ Copy `.env.example` to `.env` and fill in the required values. Minimum variables
 - `OPENAI_BASE_URL` - Base URL for the OpenAI-compatible endpoint.
 - `CHAT_MODEL` - Chat model name (defaults to `gpt-4o-mini`).
 - `EMBEDDING_MODEL` - Embedding model name (defaults to `text-embedding-3-small`).
-- `PINECONE_API_KEY` - Pinecone access token.
-- `PINECONE_INDEX_NAME` - Target Pinecone index.
-- `PINECONE_INDEX_HOST` / `PINECONE_HOST_NAME` / `PINECONE_INDEX_URL` - One of these for non-serverless indexes.
+- `MONGODB_URI` - Full MongoDB connection string (preferred).
+- or `MONGODB_USERNAME`, `MONGODB_PASSWORD`, `MONGODB_CLUSTER_URL` - Provide these if you want the app to build the URI.
+- `MONGODB_DBNAME` - Database containing your vectorized documents.
+- `MONGODB_COLLECTION` - Collection used for vector search.
+- `MONGODB_VECTOR_INDEX` - Atlas vector index name (defaults to `vector_index`).
+- `MONGODB_EMBEDDING_FIELD` - Document field that stores embeddings (defaults to `embedding`).
+- `MONGODB_VECTOR_CANDIDATES` - (Optional) Override the Atlas `numCandidates` setting for fine control.
 
 Optional extras:
 
@@ -105,9 +110,51 @@ On Unix shells replace the line continuation character `^` with `\`.
 
 ---
 
+### Streamlit app
+
+Launch a lightweight UI with Streamlit once your environment variables are configured:
+
+**From the project root directory:**
+
+```bash
+streamlit run streamlit_app.py
+```
+
+The app will start and automatically open in your default web browser at `http://localhost:8501`. If it doesn't open automatically, navigate to that URL manually.
+
+**Features:**
+- Interactive chat interface for conversing with the Sleep Assistant
+- Full conversation transcript with message history
+- Sidebar showing session metrics (user turns, latest route)
+- "Start new conversation" button to reset the session without restarting the server
+- Display of knowledge sources (MongoDB Atlas snippets) that informed each response
+- Relevance scores for retrieved documents
+
+**Requirements:**
+- Ensure your `.env` file is properly configured with OpenAI and MongoDB credentials
+- All dependencies from `requirements.txt` must be installed (including `streamlit>=1.37`)
+
+**Stopping the app:**
+- Press `Ctrl+C` in the terminal where Streamlit is running
+
+---
+
+### Prepare the knowledge base (bring your own ingestion)
+
+Populate the MongoDB collection referenced by `MONGODB_COLLECTION` with the documents you want the assistant to cite. A typical workflow is:
+
+1. Extract text from your PDFs (PyMuPDF works well for digital text; fall back to Tesseract OCR for scanned pages).
+2. Chunk each document and call `sleep_assistant.services.llm.build_embedder()` to generate OpenAI embeddings.
+3. Insert documents into MongoDB with an `embedding` array plus metadata fields such as `text`, `source_document`, and `page_number`.
+4. Create a MongoDB Atlas Vector Search index that targets the embedding field named in `MONGODB_EMBEDDING_FIELD`.
+
+Once populated, the sleep node automatically queries this collection and surfaces the snippets with the highest similarity scores.
+
+---
+
 ### Docker deployment
 
-1. Ensure your `.env` file is populated with the required OpenAI and Pinecone credentials.
+1. Ensure your `.env` file is populated with the required OpenAI and MongoDB credentials.
 2. Build the image:
    ```bash
    docker build -t sleep-assistant .
@@ -133,6 +180,7 @@ The Compose service loads variables from `.env` and exposes the API on `http://l
 |   |-- run_api.py            # FastAPI launcher
 |   |-- run_chatbot.py        # CLI entrypoint
 |-- src/
+|   |-- ingest/               # PDF/OCR utilities for knowledge prep
 |   |-- sleep_assistant/
 |       |-- api/              # FastAPI app, routers, schemas, validators
 |       |-- config/           # Environment helpers and settings
@@ -150,7 +198,7 @@ The Compose service loads variables from `.env` and exposes the API on `http://l
 ## Troubleshooting
 
 - Router misclassification - Ensure the router prompt in `src/sleep_assistant/graph/prompts/router.py` matches the latest specification; escape braces for literal JSON examples.
-- Pinecone connectivity errors - Double-check index name, region or host, and VPC access settings. Serverless indexes generally require only the name.
+- MongoDB connectivity errors - Double-check the URI (or username/password/cluster trio), ensure the database and collection exist, and confirm the vector index has finished building.
 - Model errors - The assistant depends on both chat and embedding models. Confirm the environment variables align with your OpenAI deployment.
 - LangGraph state issues - Clear the in-memory session by restarting the process; persistent storage is not included in this starter.
 
@@ -159,5 +207,5 @@ The Compose service loads variables from `.env` and exposes the API on `http://l
 ## Next steps
 
 - Add evaluation via LangSmith and exported traces.
-- Wire in persistent conversation storage or retrieval augmentation beyond Pinecone.
+- Wire in persistent conversation storage or retrieval augmentation beyond MongoDB vector search.
 - Extend the graph with new specialist nodes (for example nutrition or mindfulness) by following the patterns in `src/sleep_assistant/graph/nodes/`.

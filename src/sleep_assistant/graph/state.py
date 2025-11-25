@@ -78,6 +78,24 @@ def get_recent_user_messages(state: "ChatState", limit: int | None = None) -> Li
     return history[-limit:]
 
 
+def get_conversation_window(state: "ChatState", limit: int = 6) -> List[str]:
+    """Return the latest mixed-role messages formatted for prompts."""
+
+    messages = state.get("messages") or []
+    if not messages:
+        return []
+
+    recent: List[str] = []
+    for message in reversed(messages):
+        role = getattr(message, "type", getattr(message, "role", "assistant"))
+        content = message.content
+        text = content if isinstance(content, str) else str(content)
+        recent.append(f"{role}: {text}")
+        if len(recent) >= limit:
+            break
+    return list(reversed(recent))
+
+
 def get_last_user_message(state: "ChatState") -> str | None:
     """Return the latest user utterance, if present."""
 
@@ -97,6 +115,7 @@ __all__ = [
     "ChatState",
     "MAX_USER_HISTORY",
     "RetrievedDocument",
+    "get_conversation_window",
     "get_last_user_message",
     "get_recent_user_messages",
     "record_user_message",

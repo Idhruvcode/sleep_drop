@@ -14,12 +14,14 @@ def get_sleep_prompt() -> ChatPromptTemplate:
                 "system",
                 "You are a knowledgeable assistant that answers questions about sleep "
                 "using the provided context. Cite relevant points from the context when possible. "
-                "If the context lacks enough information, say so before offering general guidance.",
+                "Use the recent chat history to maintain continuity, and if the context lacks enough "
+                "information, say so before offering general guidance.",
             ),
             (
                 "human",
+                "Recent conversation (oldest -> newest):\n{history}\n\n"
                 "Context:\n{context}\n\n"
-                "Question:\n{question}\n\n"
+                "Latest question:\n{question}\n\n"
                 "Compose a helpful answer:",
             ),
         ]
@@ -27,4 +29,3 @@ def get_sleep_prompt() -> ChatPromptTemplate:
 
 
 __all__ = ["get_sleep_prompt"]
-

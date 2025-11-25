@@ -1,10 +1,12 @@
 {
   "include": [
     "src",
-    "scripts"
+    "scripts",
+    "streamlit_app.py"
   ],
   "extraPaths": [
-    "src"
+    "src",
+    "C:/Users/HOME/anaconda3/Lib/site-packages"
   ],
   "pythonVersion": "3.11",
   "typeCheckingMode": "basic"

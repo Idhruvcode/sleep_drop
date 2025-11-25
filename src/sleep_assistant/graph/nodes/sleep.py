@@ -7,9 +7,15 @@ from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import AIMessage
 from langchain_openai import OpenAIEmbeddings
-from pinecone import Pinecone
 
-from sleep_assistant.graph.state import ChatState, RetrievedDocument, get_last_user_message
+from sleep_assistant.graph.state import (
+    MAX_USER_HISTORY,
+    ChatState,
+    RetrievedDocument,
+    get_conversation_window,
+    get_last_user_message,
+    get_recent_user_messages,
+)
 from sleep_assistant.graph.prompts.sleep import get_sleep_prompt
 
 logger = logging.getLogger(__name__)
@@ -23,7 +29,7 @@ def build_sleep_chain(sleep_llm):
 
 
 def _extract_text(metadata: Dict[str, object]) -> Optional[str]:
-    """Return the best-guess text field from Pinecone metadata."""
+    """Return the best-guess text field from vector metadata."""
 
     text_keys = (
         "text",
@@ -40,7 +46,7 @@ def _extract_text(metadata: Dict[str, object]) -> Optional[str]:
     return None
 
 
-def make_sleep_node(index: Any, embedder: OpenAIEmbeddings, sleep_chain):
+def make_sleep_node(vector_store: Any, embedder: OpenAIEmbeddings, sleep_chain):
     """Build the LangGraph node for sleep-related responses."""
 
     def node(state: ChatState) -> Dict[str, object]:
@@ -48,8 +54,17 @@ def make_sleep_node(index: Any, embedder: OpenAIEmbeddings, sleep_chain):
         if not latest_user:
             return {"messages": [AIMessage(content="I didn't catch that. Could you repeat your question?")]}
 
-        query_embedding = embedder.embed_query(latest_user)
-        results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
+        recent_user_history = get_recent_user_messages(state, limit=MAX_USER_HISTORY)
+        if recent_user_history:
+            query_text = " ".join(recent_user_history[-2:])
+        else:
+            query_text = latest_user
+
+        history_lines = get_conversation_window(state, limit=MAX_USER_HISTORY * 2)
+        history_text = "\n".join(history_lines) if history_lines else "No prior conversation."
+
+        query_embedding = embedder.embed_query(query_text)
+        results = vector_store.query(vector=query_embedding, top_k=5, include_metadata=True)
 
         contexts: List[str] = []
         retrievals: List[RetrievedDocument] = []
@@ -80,10 +95,12 @@ def make_sleep_node(index: Any, embedder: OpenAIEmbeddings, sleep_chain):
 
         if contexts:
             combined_context = "\n\n".join(contexts)
-            logger.info("Sleep node retrieved %d document snippets from Pinecone.", len(contexts))
-            ai_message = sleep_chain.invoke({"context": combined_context, "question": latest_user})
+            logger.info("Sleep node retrieved %d document snippets from MongoDB vector search.", len(contexts))
+            ai_message = sleep_chain.invoke(
+                {"context": combined_context, "question": latest_user, "history": history_text}
+            )
         else:
-            logger.info("Sleep node found no relevant Pinecone matches for the query.")
+            logger.info("Sleep node found no relevant MongoDB matches for the query.")
             ai_message = AIMessage(
                 content="I'm not sure. I couldn't find relevant information about that in my sleep knowledge base."
             )

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from .llm import build_chat_models
-from .vectorstore import build_pinecone_index
+from .llm import build_chat_models, build_embedder
+from .mongodb_client import create_mongodb_client
+from .vectorstore import build_mongo_vector_store
 
-__all__ = ["build_chat_models", "build_pinecone_index"]
-
+__all__ = ["build_chat_models", "build_embedder", "create_mongodb_client", "build_mongo_vector_store"]

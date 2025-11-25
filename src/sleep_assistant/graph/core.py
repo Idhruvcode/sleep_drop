@@ -5,9 +5,8 @@ from __future__ import annotations
 import logging
 
 from langgraph.graph import StateGraph
-from pinecone import Pinecone
 
-from sleep_assistant.config import load_environment, require_env
+from sleep_assistant.config import load_environment
 from sleep_assistant.graph.edges import configure_edges
 from sleep_assistant.graph.nodes import (
     build_router_chain,
@@ -17,7 +16,7 @@ from sleep_assistant.graph.nodes import (
     router_node,
 )
 from sleep_assistant.graph.state import ChatState
-from sleep_assistant.services import build_chat_models, build_pinecone_index
+from sleep_assistant.services import build_chat_models, build_mongo_vector_store, create_mongodb_client
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +26,8 @@ def build_app():
 
     load_environment()
     general_llm, sleep_llm, embedder = build_chat_models()
-    pinecone_client = Pinecone(api_key=require_env("PINECONE_API_KEY"))
-    index = build_pinecone_index(pinecone_client)
+    mongo_client = create_mongodb_client()
+    vector_store = build_mongo_vector_store(mongo_client)
 
     router_chain = build_router_chain(general_llm)
     sleep_chain = build_sleep_chain(sleep_llm)
@@ -45,7 +44,7 @@ def build_app():
 
     graph.add_node("router", router_handler)
     graph.add_node("general", make_general_node(general_llm))
-    graph.add_node("sleep", make_sleep_node(index, embedder, sleep_chain))
+    graph.add_node("sleep", make_sleep_node(vector_store, embedder, sleep_chain))
 
     configure_edges(graph)
 
